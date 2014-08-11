@@ -167,7 +167,7 @@ void main() {
   vec3 flv = Dh * Fvh * Glvn / (4 * NdotL * NdotV);
 
   vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
-  vec3 LDirectSpecualar = vec3(flv) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
+  
 
   */
 

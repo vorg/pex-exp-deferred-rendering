@@ -5,6 +5,7 @@ var color = require('pex-color');
 var gen = require('pex-gen');
 var geom = require('pex-geom');
 var fx = require('pex-fx');
+var gui = require('pex-gui');
 
 var Box               = gen.Box;
 var Sphere            = gen.Sphere;
@@ -19,8 +20,10 @@ var Color             = color.Color;
 var Platform          = sys.Platform;
 var Time              = sys.Time;
 var Vec3              = geom.Vec3;
+var GUI               = gui.GUI;
 var Deferred          = require('./fx/Deferred');
 var SSAO              = require('./fx/SSAO');
+var Contrast          = require('./fx/Contrast');
 
 sys.Window.create({
   settings: {
@@ -29,7 +32,21 @@ sys.Window.create({
     type: '3d',
     fullscreen: Platform.isBrowser ? true : false
   },
+  animate: false,
+  exposure: 1,
+  contrast: 1,
+  ssaoStrength: 0.4,
+  correctGamma: true,
+  tonemapReinhard: true,
   init: function() {
+    this.gui = new GUI(this);
+    this.gui.addParam('Animate', this, 'animate');
+    this.gui.addParam('SSAO Strength', this, 'ssaoStrength', { min: 0.0, max: 1 });
+    this.gui.addParam('Tonemap Reinhard', this, 'tonemapReinhard');
+    this.gui.addParam('Exposure', this, 'exposure', { min: 0.5, max: 3 });
+    this.gui.addParam('Correct Gamma', this, 'correctGamma');
+    this.gui.addParam('Contrast', this, 'contrast', { min: 0.5, max: 3 });
+
     this.scene = [];
 
     var star = new Box().catmullClark().extrude(1).catmullClark().extrude().catmullClark();
@@ -63,7 +80,7 @@ sys.Window.create({
         k2: geom.randomFloat(0, 5),
         r: geom.randomFloat(1, 3),
         uniforms: {
-          color: Color.fromHSL(geom.randomFloat(0.5, 0.8), 0.8, 0.5)
+          color: Color.fromHSL(geom.randomFloat(0.0, 0.1), 0.95, 0.5)
         }
       });
     }
@@ -129,7 +146,7 @@ sys.Window.create({
     var color = root.render({ drawFunc: this.drawColor.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
-    var ssao = depth.ssao({ cutoutBg: 0, strength: 0.4, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
+    var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
     var nothing = root.render({ drawFunc: function() {}, width: W, height: H, bpp: 32 });
     for(var i=0; i<this.lights.length; i++) {
       var deferred = root.deferred({
@@ -141,10 +158,15 @@ sys.Window.create({
       });
       nothing = nothing.add(deferred);
     }
-    var finalColor = nothing.tonemapReinhard().correctGamma();
+    var finalColor = nothing;
+    if (this.tonemapReinhard) finalColor = finalColor.tonemapReinhard({ width: W, height: H, bpp: 32, exposure: this.exposure });
+    if (this.correctGamma) finalColor = finalColor.correctGamma({ width: W, height: H, bpp: 32 });
+    finalColor = finalColor.contrast({ width: W, height: H, bpp: 32, contrast: this.contrast });
     finalColor.blit();
     //ssao.blit()
 
     this.lightMesh.drawInstances(this.camera, this.lights);
+
+    this.gui.draw();
   }
 });
