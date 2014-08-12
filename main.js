@@ -7,25 +7,26 @@ var geom = require('pex-geom');
 var fx = require('pex-fx');
 var gui = require('pex-gui');
 
-var Box               = gen.Box;
-var Sphere            = gen.Sphere;
-var Dodecahedron      = gen.Dodecahedron;
-var Tetrahedron       = gen.Tetrahedron;
-var Mesh              = glu.Mesh;
-var PerspectiveCamera = glu.PerspectiveCamera;
-var Arcball           = glu.Arcball;
-var ShowNormals       = materials.ShowNormals;
-var SolidColor        = materials.SolidColor;
-var ShowDepth         = materials.ShowDepth;
-var Color             = color.Color;
-var Platform          = sys.Platform;
-var Time              = sys.Time;
-var Vec3              = geom.Vec3;
-var Quat              = geom.Quat;
-var GUI               = gui.GUI;
-var Deferred          = require('./fx/Deferred');
-var SSAO              = require('./fx/SSAO');
-var Contrast          = require('./fx/Contrast');
+var Box                 = gen.Box;
+var Sphere              = gen.Sphere;
+var Dodecahedron        = gen.Dodecahedron;
+var Tetrahedron         = gen.Tetrahedron;
+var Mesh                = glu.Mesh;
+var PerspectiveCamera   = glu.PerspectiveCamera;
+var Arcball             = glu.Arcball;
+var ShowNormals         = materials.ShowNormals;
+var SolidColor          = materials.SolidColor;
+var ShowDepth           = materials.ShowDepth;
+var Color               = color.Color;
+var Platform            = sys.Platform;
+var Time                = sys.Time;
+var Vec3                = geom.Vec3;
+var Quat                = geom.Quat;
+var GUI                 = gui.GUI;
+var Deferred            = require('./fx/Deferred');
+var DeferredPointLight  = require('./materials/DeferredPointLight');
+var SSAO                = require('./fx/SSAO');
+var Contrast            = require('./fx/Contrast');
 
 sys.Window.create({
   settings: {
@@ -42,6 +43,7 @@ sys.Window.create({
   correctGamma: true,
   tonemapReinhard: true,
   roughness: 0.3,
+  lightRadius: 3,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -89,6 +91,7 @@ sys.Window.create({
     for(var i=0; i<this.numLights; i++) {
       this.lights.push({
         position: new Vec3(0, 0, 0),
+        scale: new Vec3(1, 1, 1),
         t: 0,
         k1: geom.randomFloat(0, 5),
         k2: geom.randomFloat(0, 5),
@@ -100,7 +103,9 @@ sys.Window.create({
     }
 
     this.lightMesh = new Mesh(new Sphere(0.05), new SolidColor());
-    this.lightProxyMesh = new Mesh(new Sphere(1), new SolidColor());
+
+    this.deferredPointLight = new DeferredPointLight();
+    this.lightProxyMesh = new Mesh(new Sphere(this.lightRadius), this.deferredPointLight);
   },
   drawColor: function() {
     if (!this.solidColor) {
@@ -131,6 +136,18 @@ sys.Window.create({
       m.draw(this.camera);
     }.bind(this));
   },
+  drawDeferredLights: function() {
+    glu.clearColor(Color.Black);
+    glu.enableDepthReadAndWrite(false, false);
+    //glu.enableAdditiveBlending(true);
+
+    for(var i=0; i<this.lights.length; i++) {
+      this.lights[i].uniforms.lightPos = this.lights[i].position;
+      this.lights[i].uniforms.lightColor = this.lights[i].uniforms.color;
+    }
+    this.lightProxyMesh.drawInstances(this.camera, this.lights);
+    //glu.enableBlending(false);
+  },
   update: function() {
     if (!this.time) {
       this.time = 0;
@@ -152,6 +169,7 @@ sys.Window.create({
 
     glu.clearColorAndDepth(Color.Black);
     glu.enableDepthReadAndWrite(true);
+    glu.cullFace(true);
 
     var W = this.width;
     var H = this.height;
@@ -161,26 +179,36 @@ sys.Window.create({
     var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
-    var nothing = root.render({ drawFunc: function() { glu.clearColor(Color.Black); }, width: W, height: H, bpp: 32 });
-    for(var i=0; i<this.lights.length; i++) {
-      var deferred = root.deferred({
-        width: W, height: H, bpp: 32,
-        albedoMap: color, normalMap: normals, depthMap: depth,
-        camera: this.camera,
-        lightPos: this.lights[i].position, lightBrightness: this.lightBrightness, lightColor: this.lights[i].uniforms.color, lightRadius: 3,
-        occlusionMap: ssao,
-        roughness: this.roughness
-      });
-      nothing = nothing.add(deferred);
-    }
-    var finalColor = nothing;
+
+    this.deferredPointLight.uniforms.albedoMap = color;
+    this.deferredPointLight.uniforms.normalMap = normals;
+    this.deferredPointLight.uniforms.depthMap = depth;
+    this.deferredPointLight.uniforms.occlusionMap = ssao;
+    this.deferredPointLight.uniforms.roughness = this.roughness;
+    this.deferredPointLight.uniforms.camera = this.camera;
+    this.deferredPointLight.uniforms.lightPos = new Vec3(0, 0, 0);
+    this.deferredPointLight.uniforms.lightBrightness = this.lightBrightness;
+    this.deferredPointLight.uniforms.lightColor = Color.White;
+    this.deferredPointLight.uniforms.lightRadius = this.lightRadius * 5;
+
+    //var deferred = root.deferred({
+    //  width: W, height: H, bpp: 32,
+    //  albedoMap: color, normalMap: normals, depthMap: depth,
+    //  camera: this.camera,
+    //  lightPos: this.lights[i].position, lightBrightness: this.lightBrightness, lightColor: this.lights[i].uniforms.color, lightRadius: this.lightRadius,
+    //  occlusionMap: ssao,
+    //  roughness: this.roughness
+    //});
+    var lights = root.render({ drawFunc: this.drawDeferredLights.bind(this), width: W, height: H, bpp: 32 });
+    var finalColor = lights;
+
     if (this.tonemapReinhard) finalColor = finalColor.tonemapReinhard({ width: W, height: H, bpp: 32, exposure: this.exposure });
     if (this.correctGamma) finalColor = finalColor.correctGamma({ width: W, height: H, bpp: 32 });
     finalColor = finalColor.contrast({ width: W, height: H, bpp: 32, contrast: this.contrast });
     finalColor.blit();
     //ssao.blit()
 
-    this.lightMesh.drawInstances(this.camera, this.lights);
+    //this.lightMesh.drawInstances(this.camera, this.lights);
 
     this.gui.draw();
   }
