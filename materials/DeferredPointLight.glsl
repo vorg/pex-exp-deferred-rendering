@@ -9,12 +9,16 @@ attribute vec2 texCoord;
 uniform mat4 viewMatrix;
 
 uniform vec3 lightPos;
+
 varying vec3 ecLighPos;
 varying vec2 vTexCoord;
 
 void main() {
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  vTexCoord = (gl_Position.xy/gl_Position.w + vec2(1.0))/2.0;
+  vec3 pos = position;
+  vec4 ecPos = modelViewMatrix * vec4(pos, 1.0);
+  //ecPos.z = -5.0;
+  gl_Position = projectionMatrix * ecPos;
+  vTexCoord = gl_Position.xy/gl_Position.w * 0.5 + 0.5;
   ecLighPos = (viewMatrix * vec4(lightPos, 1.0)).xyz;
 }
 
@@ -231,12 +235,14 @@ void main() {
 
   FinalColor = (LDirectDiffuse + LDirectSpecualar) * occlusion;
 
-  //gl_FragColor.rgb = FinalColor;
+  gl_FragColor.rgb = FinalColor;
 
-  //gl_FragColor = vec4(lightDistance);
+  //gl_FragColor = vec4(lightDistance/lightRadius);
+  //gl_FragColor.rgb = vec3(position.x);
   //gl_FragColor.a = 1.0;
-  gl_FragColor.rgb = normal;
-  //gl_FragColor = vec4(vTexCoord, 0.0, 1.0);
+  //gl_FragColor = vec4(fract(vTexCoord*5.0), 0.0, 1.0);
+  //gl_FragColor.rgb = vec3(ecLighPos.y, 0.0, 0.0);
+  //gl_FragColor = vec4(occlusion/5.0);
 }
 
 #endif

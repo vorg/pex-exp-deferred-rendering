@@ -228,6 +228,8 @@ void main() {
 
   FinalColor = (LDirectDiffuse + LDirectSpecualar) * occlusion;
 
+  FinalColor.rgb = vec3(position.xy, 0.0);
+
   gl_FragColor.rgb = FinalColor;
 }
 

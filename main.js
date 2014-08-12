@@ -105,7 +105,7 @@ sys.Window.create({
     this.lightMesh = new Mesh(new Sphere(0.05), new SolidColor());
 
     this.deferredPointLight = new DeferredPointLight();
-    this.lightProxyMesh = new Mesh(new Sphere(this.lightRadius), this.deferredPointLight);
+    this.lightProxyMesh = new Mesh(new Sphere(this.lightRadius, 128, 128), this.deferredPointLight);
   },
   drawColor: function() {
     if (!this.solidColor) {
@@ -139,14 +139,14 @@ sys.Window.create({
   drawDeferredLights: function() {
     glu.clearColor(Color.Black);
     glu.enableDepthReadAndWrite(false, false);
-    //glu.enableAdditiveBlending(true);
+    glu.enableAdditiveBlending(true);
 
     for(var i=0; i<this.lights.length; i++) {
       this.lights[i].uniforms.lightPos = this.lights[i].position;
       this.lights[i].uniforms.lightColor = this.lights[i].uniforms.color;
     }
     this.lightProxyMesh.drawInstances(this.camera, this.lights);
-    //glu.enableBlending(false);
+    glu.enableBlending(false);
   },
   update: function() {
     if (!this.time) {
@@ -180,27 +180,30 @@ sys.Window.create({
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
 
-    this.deferredPointLight.uniforms.albedoMap = color;
-    this.deferredPointLight.uniforms.normalMap = normals;
-    this.deferredPointLight.uniforms.depthMap = depth;
-    this.deferredPointLight.uniforms.occlusionMap = ssao;
+    this.deferredPointLight.uniforms.albedoMap = color.getSourceTexture();
+    this.deferredPointLight.uniforms.normalMap = normals.getSourceTexture();
+    this.deferredPointLight.uniforms.depthMap = depth.getSourceTexture();
+    this.deferredPointLight.uniforms.occlusionMap = ssao.getSourceTexture();
     this.deferredPointLight.uniforms.roughness = this.roughness;
-    this.deferredPointLight.uniforms.camera = this.camera;
+    this.deferredPointLight.uniforms.fov = this.camera.getFov();
+    this.deferredPointLight.uniforms.near = this.camera.getNear();
+    this.deferredPointLight.uniforms.far = this.camera.getFar();
+    this.deferredPointLight.uniforms.aspectRatio = this.camera.getAspectRatio();
     this.deferredPointLight.uniforms.lightPos = new Vec3(0, 0, 0);
     this.deferredPointLight.uniforms.lightBrightness = this.lightBrightness;
     this.deferredPointLight.uniforms.lightColor = Color.White;
-    this.deferredPointLight.uniforms.lightRadius = this.lightRadius * 5;
-
-    //var deferred = root.deferred({
-    //  width: W, height: H, bpp: 32,
-    //  albedoMap: color, normalMap: normals, depthMap: depth,
-    //  camera: this.camera,
-    //  lightPos: this.lights[i].position, lightBrightness: this.lightBrightness, lightColor: this.lights[i].uniforms.color, lightRadius: this.lightRadius,
-    //  occlusionMap: ssao,
-    //  roughness: this.roughness
-    //});
+    this.deferredPointLight.uniforms.lightRadius = this.lightRadius;
     var lights = root.render({ drawFunc: this.drawDeferredLights.bind(this), width: W, height: H, bpp: 32 });
     var finalColor = lights;
+    var deferred = root.deferred({
+     width: W, height: H, bpp: 32,
+     albedoMap: color, normalMap: normals, depthMap: depth,
+     camera: this.camera,
+     lightPos: this.lights[0].position, lightBrightness: this.lightBrightness, lightColor: this.lights[0].uniforms.color, lightRadius: this.lightRadius,
+     occlusionMap: ssao,
+     roughness: this.roughness
+    });
+    //finalColor = deferred;
 
     if (this.tonemapReinhard) finalColor = finalColor.tonemapReinhard({ width: W, height: H, bpp: 32, exposure: this.exposure });
     if (this.correctGamma) finalColor = finalColor.correctGamma({ width: W, height: H, bpp: 32 });
@@ -208,7 +211,7 @@ sys.Window.create({
     finalColor.blit();
     //ssao.blit()
 
-    //this.lightMesh.drawInstances(this.camera, this.lights);
+    this.lightMesh.drawInstances(this.camera, this.lights);
 
     this.gui.draw();
   }
