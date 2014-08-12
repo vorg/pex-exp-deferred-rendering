@@ -10,6 +10,7 @@ var gui = require('pex-gui');
 var Box               = gen.Box;
 var Sphere            = gen.Sphere;
 var Dodecahedron      = gen.Dodecahedron;
+var Tetrahedron       = gen.Tetrahedron;
 var Mesh              = glu.Mesh;
 var PerspectiveCamera = glu.PerspectiveCamera;
 var Arcball           = glu.Arcball;
@@ -20,6 +21,7 @@ var Color             = color.Color;
 var Platform          = sys.Platform;
 var Time              = sys.Time;
 var Vec3              = geom.Vec3;
+var Quat              = geom.Quat;
 var GUI               = gui.GUI;
 var Deferred          = require('./fx/Deferred');
 var SSAO              = require('./fx/SSAO');
@@ -27,10 +29,11 @@ var Contrast          = require('./fx/Contrast');
 
 sys.Window.create({
   settings: {
-    width: 1280,
-    height: 720,
+    width: 1024,
+    height: 512,
     type: '3d',
-    fullscreen: Platform.isBrowser ? true : false
+    //fullscreen: Platform.isBrowser ? true : false,
+    borderless: true
   },
   animate: false,
   exposure: 1,
@@ -38,10 +41,20 @@ sys.Window.create({
   ssaoStrength: 0.4,
   correctGamma: true,
   tonemapReinhard: true,
+  roughness: 0.3,
   init: function() {
+    if (Platform.isBrowser) {
+      console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
+      console.log('OES_texture_float_linear', this.gl.getExtension("OES_texture_float_linear"));
+      console.log('OES_texture_half_float', this.gl.getExtension("OES_texture_half_float"));
+      console.log('OES_texture_half_float_linear', this.gl.getExtension("OES_texture_half_float_linear"));
+      //console.log('EXT_shader_texture_lod', this.gl.getExtension("EXT_shader_texture_lod"));
+      //console.log('OES_standard_derivatives', this.gl.getExtension("OES_standard_derivatives"));
+    }
     this.gui = new GUI(this);
     this.gui.addParam('Animate', this, 'animate');
     this.gui.addParam('SSAO Strength', this, 'ssaoStrength', { min: 0.0, max: 1 });
+    this.gui.addParam('Roughness', this, 'roughness', { min: 0.01, max: 1 });
     this.gui.addParam('Tonemap Reinhard', this, 'tonemapReinhard');
     this.gui.addParam('Exposure', this, 'exposure', { min: 0.5, max: 3 });
     this.gui.addParam('Correct Gamma', this, 'correctGamma');
@@ -53,11 +66,12 @@ sys.Window.create({
     star.computeNormals();
     this.scene.push(new Mesh(star, null));
 
-    var sphere = new Dodecahedron(0.6).triangulate();
+    var sphere = new Tetrahedron(0.6).dooSabin().triangulate().catmullClark();
     sphere.computeNormals();
     for(var i=0; i<50; i++) {
       var m = new Mesh(sphere, null);
       m.position = geom.randomVec3().normalize().scale(geom.randomFloat(1, 6));
+      m.rotation = Quat.fromDirection(geom.randomVec3().normalize());
       this.scene.push(m);
     }
 
@@ -80,7 +94,7 @@ sys.Window.create({
         k2: geom.randomFloat(0, 5),
         r: geom.randomFloat(1, 3),
         uniforms: {
-          color: Color.fromHSL(geom.randomFloat(0.0, 0.1), 0.95, 0.5)
+          color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.35)
         }
       });
     }
@@ -147,7 +161,7 @@ sys.Window.create({
     var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
-    var nothing = root.render({ drawFunc: function() {}, width: W, height: H, bpp: 32 });
+    var nothing = root.render({ drawFunc: function() { glu.clearColor(Color.Black); }, width: W, height: H, bpp: 32 });
     for(var i=0; i<this.lights.length; i++) {
       var deferred = root.deferred({
         width: W, height: H, bpp: 32,
@@ -155,6 +169,7 @@ sys.Window.create({
         camera: this.camera,
         lightPos: this.lights[i].position, lightBrightness: this.lightBrightness, lightColor: this.lights[i].uniforms.color, lightRadius: 3,
         occlusionMap: ssao,
+        roughness: this.roughness
       });
       nothing = nothing.add(deferred);
     }

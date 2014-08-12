@@ -29,6 +29,7 @@ FXStage.prototype.deferred = function (options) {
   program.uniforms.lightColor(options.lightColor);
   program.uniforms.lightBrightness(options.lightBrightness);
   program.uniforms.lightRadius(options.lightRadius);
+  program.uniforms.roughness(options.roughness);
   this.drawFullScreenQuad(outputSize.width, outputSize.height, null, program);
   rt.unbind();
   return this.asFXStage(rt, 'pbr');

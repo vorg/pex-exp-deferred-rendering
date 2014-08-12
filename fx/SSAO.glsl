@@ -38,7 +38,7 @@ vec2 rand(vec2 coord) {
 
 float compareDepths( in float depth1, in float depth2 )
 {
-  float aoCap = 1;
+  float aoCap = 1.0;
   float aoMultiplier = 100.0;
   float depthTolerance = 0.003;
   float aorange = 5.0;// units in space the AO effect extends to (this gets divided by the camera far range

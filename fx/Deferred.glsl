@@ -32,6 +32,8 @@ uniform float lightBrightness;
 uniform float lightRadius;
 uniform vec4 lightColor;
 
+uniform float roughness;
+
 uniform float fov;
 uniform float near;
 uniform float far;
@@ -49,18 +51,18 @@ const float PI = 3.14159265358979323846;
 
 //From Disney princlpled BRDF
 float SchlickFresnel(float u) {
-  float m = clamp(1-u, 0, 1);
+  float m = clamp(1.0-u, 0.0, 1.0);
   float m2 = m*m;
   return m2*m2*m; // pow(m,5)
 }
 
 vec3 Fresnel(vec3 specAlbedo, vec3 H, vec3 L) {
   float LdotH = clamp(dot(L, H), 0.0, 1.0);
-  return specAlbedo + (1.0f - specAlbedo) * pow((1.0f - LdotH), 5.0f);
+  return specAlbedo + (1.0 - specAlbedo) * pow((1.0 - LdotH), 5.0);
 }
 
 vec3 getViewRay(vec2 tc) {
-  float hfar = 2.0 * tan(fov/2/180.0 * PI) * far;
+  float hfar = 2.0 * tan(fov/2.0/180.0 * PI) * far;
   float wfar = hfar * aspectRatio;
   vec3 ray = (vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far));
   return ray;
@@ -103,8 +105,14 @@ void main() {
   float maxMipMapLevel = 6.0; //most blurry
   vec3 F0 = specularColor;
 
+  if (lightDistance < lightRadius) {
+  }
+  else {
+  //  discard;
+  }
+
   float metallic = 0.0;
-  float roughness = 0.1; //0 - reflective, 1 - matte
+  //float roughness = 0.9; //0 - reflective, 1 - matte
   float smoothness = 1.0 - roughness;    //0 - matte, 1 - reflective
   float specular = 0.5;
 
@@ -120,7 +128,7 @@ void main() {
 
   */
   //Based on "Real Shading in Unreal Engine 4"
-  float lightFalloff = pow(clamp(1.0 - pow(lightDistance/lightRadius, 4.0), 0.0, 1.0), 2.0) / (pow(lightDistance, 2.0) + 1);
+  float lightFalloff = pow(clamp(1.0 - pow(lightDistance/lightRadius, 4.0), 0.0, 1.0), 2.0) / (pow(lightDistance, 2.0) + 1.0);
 
   /*
   //Indirect diffuse
@@ -147,13 +155,13 @@ void main() {
   //D(h) = --------------------------------
   //       PI * ((n.h)^2 * (a^2 - 1) + 1)^2
   float aSqr = a * a;
-  float Ddenom = NdotH * NdotH * (aSqr - 1.0) + 1;
+  float Ddenom = NdotH * NdotH * (aSqr - 1.0) + 1.0;
   float Dh = aSqr / ( PI * Ddenom * Ddenom);
 
   //Fresnel Term: Fresnel schlick
   //F(v,h) = F0 + (1 - F0)*(1 - (v.h))^5
   //Linear interpolation between specular color F0 and white
-  vec3 Fvh = F0 + (1 - F0) * pow((1 - VdotH), 5.0);
+  vec3 Fvh = F0 + (1.0 - F0) * pow((1.0 - VdotH), 5.0);
 
   /*
   //Indirect specular
@@ -170,7 +178,7 @@ void main() {
   float Glvn = G1l * G1v;
 
   //Complete Cook-Torrance
-  vec3 flv = Dh * Fvh * Glvn / (4 * NdotL * NdotV);
+  vec3 flv = Dh * Fvh * Glvn / (4.0 * NdotL * NdotV);
 
   //vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
   vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
