@@ -44,6 +44,7 @@ sys.Window.create({
   tonemapReinhard: true,
   roughness: 0.3,
   lightRadius: 2,
+  numLights: 1,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -63,6 +64,8 @@ sys.Window.create({
     this.gui.addParam('Contrast', this, 'contrast', { min: 0.5, max: 3 });
 
     this.scene = [];
+
+    geom.randomSeed(0);
 
     var star = new Box().catmullClark().extrude(1).catmullClark().extrude().catmullClark();
     star.computeNormals();
@@ -84,9 +87,6 @@ sys.Window.create({
     this.lightBrightness = 5;
     this.solidColor = new SolidColor();
 
-    this.numLights = 30;
-
-    geom.randomSeed(0);
 
     this.lights = [];
     for(var i=0; i<this.numLights; i++) {
@@ -138,16 +138,34 @@ sys.Window.create({
     }.bind(this));
   },
   drawDeferredLights: function() {
-    glu.clearColor(Color.Black);
+    glu.clearColorAndDepth(Color.Black);
     glu.enableDepthReadAndWrite(false, false);
     glu.enableAdditiveBlending(true);
+
+    var gl = this.gl;
+
+    //'shared depth buffer with the scen'
+    gl.colorMask(0, 0, 0, 0);
+    glu.enableDepthReadAndWrite(true);
+    gl.depthFunc(gl.LEQUAL);
+    this.drawScene(this.solidColor); //just depth
+    gl.colorMask(1, 1, 1, 1);
+    //gl.enable(gl.DEPTH_TEST);
+    //gl.enable(gl.CULL_FACE);
+
+    gl.cullFace(gl.FRONT); gl.depthFunc(gl.GREATER);
+    //gl.cullFace(gl.BACK); gl.depthFunc(gl.LESS);
 
     for(var i=0; i<this.lights.length; i++) {
       this.lights[i].uniforms.lightPos = this.lights[i].position;
       this.lights[i].uniforms.lightColor = this.lights[i].uniforms.color;
     }
+    glu.enableDepthReadAndWrite(true, false);
     this.lightProxyMesh.drawInstances(this.camera, this.lights);
     glu.enableBlending(false);
+    gl.depthFunc(gl.LEQUAL);
+    gl.disable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
   },
   update: function() {
     if (!this.time) {
@@ -195,7 +213,7 @@ sys.Window.create({
     this.deferredPointLight.uniforms.lightBrightness = this.lightBrightness;
     this.deferredPointLight.uniforms.lightColor = Color.White;
     this.deferredPointLight.uniforms.lightRadius = this.lightRadius;
-    var lights = root.render({ drawFunc: this.drawDeferredLights.bind(this), width: W, height: H, bpp: 32 });
+    var lights = root.render({ drawFunc: this.drawDeferredLights.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var finalColor = lights;
     //var deferred = root.deferred({
     // width: W, height: H, bpp: 32,

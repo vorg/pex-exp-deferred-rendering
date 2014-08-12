@@ -240,8 +240,10 @@ void main() {
 
   gl_FragColor.rgb = FinalColor;
 
-  //gl_FragColor.rgb = vec3(0.1, lightFalloff, 0.0);
-  //gl_FragColor.rgb = vec3(0.01,  lightFalloff, 0.0);
+  gl_FragColor.rgb = normal * 0.5 + 0.5;
+
+  //gl_FragColor.rgb = vec3(0.01, 0.0, 0.0);
+  //gl_FragColor.rgb += vec3(0.01,  lightFalloff, 0.0);
 
   //gl_FragColor = vec4(lightDistance/lightRadius);
   //gl_FragColor.rgb = vec3(position.x);
