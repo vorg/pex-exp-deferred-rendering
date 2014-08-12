@@ -43,7 +43,7 @@ sys.Window.create({
   correctGamma: true,
   tonemapReinhard: true,
   roughness: 0.3,
-  lightRadius: 3,
+  lightRadius: 1.5,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -83,7 +83,7 @@ sys.Window.create({
     this.lightPos = new Vec3(3, 3, 3);
     this.lightBrightness = 5;
 
-    this.numLights = 20;
+    this.numLights = 100;
 
     geom.randomSeed(0);
 
@@ -165,6 +165,7 @@ sys.Window.create({
     this.lightPos = new Vec3(0, 0, 1);
   },
   draw: function() {
+    Time.verbose = true;
     this.update();
 
     glu.clearColorAndDepth(Color.Black);

@@ -12,10 +12,12 @@ uniform vec3 lightPos;
 
 varying vec3 ecLighPos;
 varying vec2 vTexCoord;
+uniform float near;
 
 void main() {
   vec3 pos = position;
   vec4 ecPos = modelViewMatrix * vec4(pos, 1.0);
+  ecPos.z = min(ecPos.z, -near - 0.0001);
   //ecPos.z = -5.0;
   gl_Position = projectionMatrix * ecPos;
   vTexCoord = gl_Position.xy/gl_Position.w * 0.5 + 0.5;
@@ -236,6 +238,8 @@ void main() {
   FinalColor = (LDirectDiffuse + LDirectSpecualar) * occlusion;
 
   gl_FragColor.rgb = FinalColor;
+
+  //gl_FragColor.rgb += vec3(0.1, lightFalloff, 0.0);
 
   //gl_FragColor = vec4(lightDistance/lightRadius);
   //gl_FragColor.rgb = vec3(position.x);
