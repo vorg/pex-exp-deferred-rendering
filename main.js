@@ -33,8 +33,10 @@ sys.Window.create({
     width: 1024,
     height: 512,
     type: '3d',
-    //fullscreen: Platform.isBrowser ? true : false,
+    fullscreen: Platform.isBrowser ? true : false,
+    //highdpi: Platform.isBrowser ? 2 : false,
     borderless: true,
+
   },
   animate: false,
   exposure: 1,
@@ -44,7 +46,7 @@ sys.Window.create({
   tonemapReinhard: true,
   roughness: 0.3,
   lightRadius: 2,
-  numLights: 1,
+  numLights: 50,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -69,7 +71,8 @@ sys.Window.create({
 
     var star = new Box().catmullClark().extrude(1).catmullClark().extrude().catmullClark();
     star.computeNormals();
-    this.scene.push(new Mesh(star, null));
+    this.starMesh = new Mesh(star, null);
+    this.scene.push(this.starMesh);
 
     var sphere = new Tetrahedron(0.6).dooSabin().triangulate().catmullClark();
     sphere.computeNormals();
@@ -80,7 +83,7 @@ sys.Window.create({
       this.scene.push(m);
     }
 
-    this.camera = new PerspectiveCamera(60, this.width / this.height, 1, 10);
+    this.camera = new PerspectiveCamera(60, 2/1, 1, 100);
     this.arcball = new Arcball(this, this.camera, 5);
 
     this.lightPos = new Vec3(3, 3, 3);
@@ -94,11 +97,13 @@ sys.Window.create({
         position: new Vec3(0, 0, 0),
         scale: new Vec3(1, 1, 1),
         t: 0,
+        dt: geom.randomFloat(0, 1),
         k1: geom.randomFloat(0, 5),
         k2: geom.randomFloat(0, 5),
         r: geom.randomFloat(1, 3),
         uniforms: {
-          color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.35)
+          //color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.35)
+          color: Color.fromHSL(0, 0, 1)
         }
       });
     }
@@ -138,7 +143,7 @@ sys.Window.create({
     }.bind(this));
   },
   drawDeferredLights: function() {
-    glu.clearColorAndDepth(Color.Black);
+    glu.clearColorAndDepth(new Color(0.01, 0.01, 0.01, 1.0));
     glu.enableDepthReadAndWrite(false, false);
     glu.enableAdditiveBlending(true);
 
@@ -177,8 +182,25 @@ sys.Window.create({
     this.lights.forEach(function(light) {
       light.position.x = light.r * Math.sin(this.time + light.k1)
       light.position.y = light.r * Math.cos(this.time + light.k2)
+      //light.position.y = -1 + light.dt;
       light.position.z = light.r * Math.sin(this.time + 0.5 * light.k2) + Math.sin(this.time + light.k1)
+      var d = 5;
+      var t = (Time.seconds + light.dt * d) % (d+1);
+      var a = 1/40;
+      var r = 1/(a*Math.sqrt(Math.PI))*Math.pow(Math.E, -(t-d)*(t-d)/(a*a));
+      light.uniforms.lightBrightness = Math.min(r, 5.0);
+      light.uniforms.color.r = light.uniforms.color.g = light.uniforms.color.b = Math.min(r, 1.0);
+      light.uniforms.color.b *= 1.2;
     }.bind(this));
+
+    //this.lights.length = 1;
+
+    this.lights[0].uniforms.lightBrightness = 0.5;
+    this.lights[0].uniforms.lightRadius = this.lightRadius * 5;
+    this.lights[0].uniforms.color.r = this.lights[0].uniforms.color.g = this.lights[0].uniforms.color.b = 1.0;
+    this.lights[0].scale.set(1, 5, 5);
+    this.lights[0].position = new Vec3(0, 2, 2);
+    this.lights[0].uniforms.lightPos = this.lights[0].position;
 
     this.lightPos = this.lights[0].position;
     this.lightPos = new Vec3(0, 0, 1);
@@ -191,8 +213,8 @@ sys.Window.create({
     glu.enableDepthReadAndWrite(true);
     glu.cullFace(true);
 
-    var W = this.width;
-    var H = this.height;
+    var W = 2048;
+    var H = 1024;
 
     var root = fx();
     var color = root.render({ drawFunc: this.drawColor.bind(this), depth: true, width: W, height: H, bpp: 32 });
@@ -228,15 +250,24 @@ sys.Window.create({
     if (this.tonemapReinhard) finalColor = finalColor.tonemapReinhard({ width: W, height: H, bpp: 32, exposure: this.exposure });
     if (this.correctGamma) finalColor = finalColor.correctGamma({ width: W, height: H, bpp: 32 });
     finalColor = finalColor.contrast({ width: W, height: H, bpp: 32, contrast: this.contrast });
-    finalColor.blit();
+
+    var scale = Math.min(this.width / W, this.height / H);
+    finalColor.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
     //ssao.blit()
 
     this.gl.colorMask(0, 0, 0, 0);
     glu.enableDepthReadAndWrite(true);
     this.drawScene(this.solidColor); //just depth
     this.gl.colorMask(1, 1, 1, 1);
+
+    this.lights[0].scale.set(1, 1, 1)
     this.lightMesh.drawInstances(this.camera, this.lights);
 
+    //this.gl.writeImage('png', 'frame' + Time.frameNumber + '.png');
+
+    //this.starMesh.rotation = Quat.fromAxisAngle(new Vec3(0, 1, 0), Time.seconds * 10)
+
+    glu.viewport(0, 0, this.width, this.height);
     this.gui.draw();
   }
 });
