@@ -104,6 +104,9 @@ void main() {
   vec3 F0 = specularColor;
 
   float metallic = 0.0;
+  float roughness = 0.1; //0 - reflective, 1 - matte
+  float smoothness = 1.0 - roughness;    //0 - matte, 1 - reflective
+  float specular = 0.5;
 
   /*
 
@@ -122,6 +125,7 @@ void main() {
   /*
   //Indirect diffuse
   vec3 LIndirectDiffuse = mix(albedoColor, envSpecular, metallic) * envAmbient * (1.0 - metallic); //TODO: what's metal color?
+  */
 
   //Diffuse Fresnel (Disney) aka glossy Fresnel
   //Should be 2D lookup texture for IBL as in UnreadEngine4
@@ -151,8 +155,10 @@ void main() {
   //Linear interpolation between specular color F0 and white
   vec3 Fvh = F0 + (1 - F0) * pow((1 - VdotH), 5.0);
 
+  /*
   //Indirect specular
   vec3 LIndirectSpecular = Fvh * specular * envSpecular * NdotL; //TODO: Fresnel * IBLspec(roughness)
+  */
 
   //Visibility Term: Schlick-Smith
   //                                          n.v               (0.8 + 0.5*a)^2
@@ -166,12 +172,9 @@ void main() {
   //Complete Cook-Torrance
   vec3 flv = Dh * Fvh * Glvn / (4 * NdotL * NdotV);
 
-  vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
-  
-
-  */
-
+  //vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
   vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
+  vec3 LDirectSpecualar = vec3(flv) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
   /*
 
   
@@ -215,7 +218,7 @@ void main() {
   //FinalColor *= fogFactor;
   */
 
-  FinalColor = vec3(LDirectDiffuse) * occlusion;
+  FinalColor = (LDirectDiffuse + LDirectSpecualar) * occlusion;
 
   gl_FragColor.rgb = FinalColor;
 }
