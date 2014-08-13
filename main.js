@@ -102,8 +102,7 @@ sys.Window.create({
         k2: geom.randomFloat(0, 5),
         r: geom.randomFloat(1, 3),
         uniforms: {
-          //color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.35)
-          color: Color.fromHSL(0, 0, 1)
+          color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.35)
         }
       });
     }
@@ -181,21 +180,7 @@ sys.Window.create({
       light.position.x = light.r * Math.sin(this.time + light.k1)
       light.position.y = light.r * Math.cos(this.time + light.k2)
       light.position.z = light.r * Math.sin(this.time + 0.5 * light.k2) + Math.sin(this.time + light.k1)
-      var d = 5;
-      var t = (Time.seconds + light.dt * d) % (d+1);
-      var a = 1/40;
-      var r = 1/(a*Math.sqrt(Math.PI))*Math.pow(Math.E, -(t-d)*(t-d)/(a*a));
-      light.uniforms.lightBrightness = Math.min(r, 5.0);
-      light.uniforms.color.r = light.uniforms.color.g = light.uniforms.color.b = Math.min(r, 1.0);
-      light.uniforms.color.b *= 1.2;
     }.bind(this));
-
-    this.lights[0].uniforms.lightBrightness = 0.5;
-    this.lights[0].uniforms.lightRadius = this.lightRadius * 5;
-    this.lights[0].uniforms.color.r = this.lights[0].uniforms.color.g = this.lights[0].uniforms.color.b = 1.0;
-    this.lights[0].scale.set(1, 5, 5);
-    this.lights[0].position = new Vec3(0, 2, 2);
-    this.lights[0].uniforms.lightPos = this.lights[0].position;
 
     this.lightPos = this.lights[0].position;
     this.lightPos = new Vec3(0, 0, 1);
