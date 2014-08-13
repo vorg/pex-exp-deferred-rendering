@@ -45,8 +45,8 @@ sys.Window.create({
   correctGamma: true,
   tonemapReinhard: true,
   roughness: 0.3,
-  lightRadius: 2,
-  numLights: 50,
+  lightRadius: 0.95,
+  numLights: 200,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -102,9 +102,11 @@ sys.Window.create({
         k2: geom.randomFloat(0, 5),
         r: geom.randomFloat(1, 3),
         uniforms: {
-          color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.35)
+          color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.25)
         }
       });
+      var l = this.lights[this.lights.length-1];
+      l.uniforms.color = Color.fromHSL(l.k2 % 1, 0.8, 0.25)
     }
 
     this.lightMesh = new Mesh(new Sphere(0.05), new SolidColor());
@@ -231,7 +233,7 @@ sys.Window.create({
     this.gl.colorMask(1, 1, 1, 1);
 
     this.lights[0].scale.set(1, 1, 1)
-    this.lightMesh.drawInstances(this.camera, this.lights);
+    //this.lightMesh.drawInstances(this.camera, this.lights);
 
     glu.viewport(0, 0, this.width, this.height);
     this.gui.draw();
