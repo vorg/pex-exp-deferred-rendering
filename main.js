@@ -46,18 +46,15 @@ sys.Window.create({
     width: 1024,
     height: 512,
     type: '3d',
-    fullscreen: Platform.isBrowser ? true : false,
-    //fullscreen: true,
-    //highdpi: Platform.isBrowser ? 2 : false,
-    borderless: true,
-
+    fullscreen: true,
+    highdpi: 1
   },
   animate: true,
   exposure: 1,
   contrast: 1,
   ssaoStrength: 0.4,
   correctGamma: true,
-  ssao: true,
+  ssao: false,
   tonemapReinhard: true,
   roughness: 0.3,
   lightRadius: 0.95,
@@ -261,6 +258,8 @@ sys.Window.create({
     this.lightMesh.drawInstances(this.camera, this.lights);
 
     //ssao.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
+
+    //glu.clearColorAndDepth(Color.Red);
 
     glu.viewport(0, 0, this.width, this.height);
     this.gui.draw();
