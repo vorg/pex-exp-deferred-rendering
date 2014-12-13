@@ -42,8 +42,8 @@ function evalPos(theta, phi) {
 
 sys.Window.create({
   settings: {
-    width: 1024,
-    height: 512,
+    width: 1280,
+    height: 720,
     type: '3d',
     fullscreen: true,
     highdpi: 1
@@ -220,13 +220,14 @@ sys.Window.create({
 
     var W = 2048;
     var H = 1024;
+    var BPP = 32;
 
     var root = fx();
-    var color = root.render({ drawFunc: this.drawColor.bind(this), depth: true, width: W, height: H, bpp: 32 });
-    var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: 32 });
+    var color = root.render({ drawFunc: this.drawColor.bind(this), depth: true, width: W, height: H, bpp: BPP });
+    var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: BPP });
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var ssao = color;
-    if (this.ssao) ssao = depth.ssao({ strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
+    if (this.ssao) ssao = depth.ssao({ strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: BPP, camera: this.camera });
     this.deferredPointLight.uniforms.wrap = this.wrap;
     this.deferredPointLight.uniforms.correctGamma = this.correctGamma ? 1 : 0;
     this.deferredPointLight.uniforms.albedoMap = color.getSourceTexture();
@@ -242,14 +243,14 @@ sys.Window.create({
     this.deferredPointLight.uniforms.lightBrightness = this.lightBrightness;
     this.deferredPointLight.uniforms.lightColor = Color.White;
     this.deferredPointLight.uniforms.lightRadius = this.lightRadius;
-    var lights = root.render({ drawFunc: this.drawDeferredLights.bind(this), depth: true, width: W, height: H, bpp: 32 });
+    var lights = root.render({ drawFunc: this.drawDeferredLights.bind(this), depth: true, width: W, height: H, bpp: BPP });
     var finalColor = lights;
 
-    if (this.tonemapReinhard) finalColor = finalColor.tonemapReinhard({ width: W, height: H, bpp: 32, exposure: this.exposure });
-    if (this.correctGamma) finalColor = finalColor.correctGamma({ width: W, height: H, bpp: 32 });
-    finalColor = finalColor.contrast({ width: W, height: H, bpp: 32, contrast: this.contrast });
+    if (this.tonemapReinhard) finalColor = finalColor.tonemapReinhard({ width: W, height: H, bpp: BPP, exposure: this.exposure });
+    if (this.correctGamma) finalColor = finalColor.correctGamma({ width: W, height: H, bpp: BPP });
+    finalColor = finalColor.contrast({ width: W, height: H, bpp: BPP, contrast: this.contrast });
 
-    var scale = Math.min(this.width / W, this.height / H);
+    var scale = Math.max(this.width / W, this.height / H);
     finalColor.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
 
     glu.viewport((this.width - W * scale)/2, (this.height - H * scale)/2, W * scale, H * scale);
@@ -267,6 +268,6 @@ sys.Window.create({
     //glu.clearColorAndDepth(Color.Red);
 
     glu.viewport(0, 0, this.width, this.height);
-    this.gui.draw();
+    //this.gui.draw();
   }
 });
