@@ -44,10 +44,12 @@ uniform vec4 lightColor;
 
 uniform float roughness;
 
+uniform float wrap;
 uniform float fov;
 uniform float near;
 uniform float far;
 uniform float aspectRatio;
+uniform float correctGamma;
 
 const float PI = 3.14159265358979323846;
 
@@ -112,7 +114,8 @@ vec3 reconstructPositionFromDepth(vec2 texCoord, float z) {
 void main() {
   vec3 normal = texture2D(normalMap, vTexCoord).rgb; //assumes rgb = ecNormal.xyz + 0.5
   vec4 albedoValue = texture2D(albedoMap, vTexCoord);
-  vec3 albedoColor = pow(albedoValue.rgb, vec3(2.2));
+  float gammaPow = mix(1.0, 2.2, correctGamma);
+  vec3 albedoColor = pow(albedoValue.rgb, vec3(gammaPow));
   vec3 specularColor = albedoColor; //for now
   float depth = texture2D(depthMap, vTexCoord).a; //assumes a = len(ecPos.xyz)
   float occlusion = texture2D(occlusionMap, vTexCoord).r;
@@ -125,11 +128,11 @@ void main() {
   vec3 V = normalize(-position.xyz);
   vec3 H = normalize(L + V);
 
-  float NdotL = clamp(dot(N, L), 0.0, 1.0);
-  float NdotV = clamp(dot(N, V), 0.0, 1.0);
-  float LdotH = clamp(dot(L, H), 0.0, 1.0);
-  float NdotH = clamp(dot(N, H), 0.0, 1.0);
-  float VdotH = clamp(dot(V, H), 0.0, 1.0);
+  float NdotL = clamp((dot(N, L) + wrap)/(1.0+wrap), 0.0, 1.0);
+  float NdotV = clamp((dot(N, V) + wrap)/(1.0+wrap), 0.0, 1.0);
+  float LdotH = clamp((dot(L, H) + wrap)/(1.0+wrap), 0.0, 1.0);
+  float NdotH = clamp((dot(N, H) + wrap)/(1.0+wrap), 0.0, 1.0);
+  float VdotH = clamp((dot(V, H) + wrap)/(1.0+wrap), 0.0, 1.0);
 
   float lightDistance = length(ecLighPos - position.xyz);
   float maxMipMapLevel = 6.0; //most blurry
@@ -140,7 +143,7 @@ void main() {
   float specular = 0.5;
 
   //Based on "Real Shading in Unreal Engine 4"
-  float lightFalloff = pow(clamp(1.0 - pow(lightDistance/lightRadius, 4.0), 0.0, 1.0), 2.0) / (pow(lightDistance, 2.0) + 1.0);
+  float lightFalloff = 0.1 + pow(clamp(1.0 - pow(lightDistance/lightRadius, 4.0), 0.0, 1.0), 2.0) / (pow(lightDistance, 2.0) + 1.0);
 
   //Diffuse Fresnel (Disney) aka glossy Fresnel
   //Should be 2D lookup texture for IBL as in UnreadEngine4

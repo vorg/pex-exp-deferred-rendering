@@ -25,7 +25,6 @@ var Time                = sys.Time;
 var Vec3                = geom.Vec3;
 var Quat                = geom.Quat;
 var GUI                 = gui.GUI;
-var Deferred            = require('./fx/Deferred');
 var DeferredPointLight  = require('./materials/DeferredPointLight');
 var Contrast            = require('./fx/Contrast');
 
@@ -59,6 +58,7 @@ sys.Window.create({
   roughness: 0.3,
   lightRadius: 0.95,
   numLights: 100,
+  wrap: 0,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -70,6 +70,7 @@ sys.Window.create({
     }
     this.gui = new GUI(this);
     this.gui.addParam('Animate', this, 'animate');
+    this.gui.addParam('Wrap light', this, 'wrap');
     this.gui.addParam('SSAO', this, 'ssao');
     this.gui.addParam('SSAO Strength', this, 'ssaoStrength', { min: 0.0, max: 10 });
     this.gui.addParam('Roughness', this, 'roughness', { min: 0.01, max: 1 });
@@ -226,6 +227,8 @@ sys.Window.create({
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var ssao = color;
     if (this.ssao) ssao = depth.ssao({ strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
+    this.deferredPointLight.uniforms.wrap = this.wrap;
+    this.deferredPointLight.uniforms.correctGamma = this.correctGamma ? 1 : 0;
     this.deferredPointLight.uniforms.albedoMap = color.getSourceTexture();
     this.deferredPointLight.uniforms.normalMap = normals.getSourceTexture();
     this.deferredPointLight.uniforms.depthMap = depth.getSourceTexture();
@@ -248,6 +251,8 @@ sys.Window.create({
 
     var scale = Math.min(this.width / W, this.height / H);
     finalColor.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
+
+    glu.viewport((this.width - W * scale)/2, (this.height - H * scale)/2, W * scale, H * scale);
 
     this.gl.colorMask(0, 0, 0, 0);
     glu.enableDepthReadAndWrite(true);

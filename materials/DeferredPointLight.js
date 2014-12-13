@@ -24,7 +24,9 @@ function DeferredPointLight(uniforms) {
     lightPos: new Vec3(0, 0, 0),
     lightBrightness: 1,
     lightColor: Color.White,
-    lightRadius: 1
+    lightRadius: 1,
+    wrap: 0,
+    correctGamma: 0
   };
   uniforms = merge(defaults, uniforms);
   Material.call(this, program, uniforms);
