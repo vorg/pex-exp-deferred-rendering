@@ -57,7 +57,7 @@ sys.Window.create({
   tonemapReinhard: true,
   roughness: 0.3,
   lightRadius: 0.95,
-  numLights: 100,
+  numLights: Platform.isMobile ? 20 : 100,
   wrap: 0,
   init: function() {
     if (Platform.isBrowser) {
@@ -218,8 +218,8 @@ sys.Window.create({
     glu.enableDepthReadAndWrite(true);
     glu.cullFace(true);
 
-    var W = 2048;
-    var H = 1024;
+    var W = Platform.isMobile ? 2048 : 1024;
+    var H = Platform.isMobile ? 1024 : 512;
     var BPP = 32;
 
     var root = fx();
