@@ -183,7 +183,9 @@ void main() {
   float Glvn = G1l * G1v;
 
   //Complete Cook-Torrance
-  vec3 flv = Dh * Fvh * Glvn / (4.0 * NdotL * NdotV);
+  float fDenom = (4.0 * NdotL * NdotV);
+  if (fDenom == 0.0) fDenom = 1.0;
+  vec3 flv = Dh * Fvh * Glvn / fDenom;
 
   //vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
   vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
