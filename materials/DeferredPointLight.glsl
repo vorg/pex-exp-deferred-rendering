@@ -87,7 +87,7 @@ vec3 reconstructPositionFromDepth(vec2 texCoord, float z) {
 //Problems more sharp metal doesn't get darker
 
 void main() {
-  vec3 normal = texture2D(normalMap, vTexCoord).rgb; //assumes rgb = ecNormal.xyz + 0.5
+  vec3 normal = texture2D(normalMap, vTexCoord).rgb - 0.5; //assumes rgb = ecNormal.xyz + 0.5
   vec4 albedoValue = texture2D(albedoMap, vTexCoord);
   vec3 albedoColor = pow(albedoValue.rgb, vec3(2.2));
   vec3 specularColor = albedoColor; //for now
@@ -190,8 +190,8 @@ void main() {
   vec3 flv = Dh * Fvh * Glvn / (4.0 * NdotL * NdotV);
 
   //vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
-  vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
-  vec3 LDirectSpecualar = vec3(flv) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
+  vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * 1.0 * clamp(NdotL, 0.0, 1.0);
+  vec3 LDirectSpecualar = vec3(flv) * lightBrightness * lightColor.rgb * 1.0 * clamp(NdotL, 0.0, 1.0);
   /*
 
   
@@ -239,6 +239,8 @@ void main() {
   FinalColor = (LDirectDiffuse + LDirectSpecualar);
 
   gl_FragColor.rgb = FinalColor;
+
+  //gl_FragColor.rgb = vec3(normal);
 
   //gl_FragColor.rgb = normal * 0.5 + 0.5;
 

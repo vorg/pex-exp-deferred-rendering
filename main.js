@@ -6,6 +6,7 @@ var gen = require('pex-gen');
 var geom = require('pex-geom');
 var fx = require('pex-fx');
 var gui = require('pex-gui');
+var random = require('pex-random');
 
 var Box                 = gen.Box;
 var Sphere              = gen.Sphere;
@@ -28,17 +29,30 @@ var DeferredPointLight  = require('./materials/DeferredPointLight');
 var SSAO                = require('./fx/SSAO');
 var Contrast            = require('./fx/Contrast');
 
+var UP = new Vec3(0, 1, 0);
+
+var degToRad = 1/180.0 * Math.PI;
+
+function evalPos(theta, phi) {
+  var pos = new Vec3();
+  pos.x = Math.sin(theta * degToRad) * Math.sin(phi * degToRad);
+  pos.y = Math.cos(theta * degToRad);
+  pos.z = Math.sin(theta * degToRad) * Math.cos(phi * degToRad);
+  return pos;
+}
+
 sys.Window.create({
   settings: {
     width: 1024,
     height: 512,
     type: '3d',
-    fullscreen: Platform.isBrowser ? true : false,
+    //fullscreen: Platform.isBrowser ? true : false,
+    fullscreen: true,
     //highdpi: Platform.isBrowser ? 2 : false,
     borderless: true,
 
   },
-  animate: false,
+  animate: true,
   exposure: 1,
   contrast: 1,
   ssaoStrength: 0.4,
@@ -46,7 +60,7 @@ sys.Window.create({
   tonemapReinhard: true,
   roughness: 0.3,
   lightRadius: 0.95,
-  numLights: 200,
+  numLights: 100,
   init: function() {
     if (Platform.isBrowser) {
       console.log('OES_texture_float', this.gl.getExtension("OES_texture_float"));
@@ -67,7 +81,7 @@ sys.Window.create({
 
     this.scene = [];
 
-    geom.randomSeed(0);
+    random.seed(0);
 
     var star = new Box().catmullClark().extrude(1).catmullClark().extrude().catmullClark();
     star.computeNormals();
@@ -76,11 +90,16 @@ sys.Window.create({
 
     var sphere = new Tetrahedron(0.6).dooSabin().triangulate().catmullClark();
     sphere.computeNormals();
+    this.spheres = [];
     for(var i=0; i<50; i++) {
       var m = new Mesh(sphere, null);
-      m.position = geom.randomVec3().normalize().scale(geom.randomFloat(2, 6));
-      m.rotation = Quat.fromDirection(geom.randomVec3().normalize());
+      //m.position = random.vec3().normalize().scale();
+      m.radius = random.float(2, 6);
+      m.theta = random.float(0, 180);
+      m.phi = random.float(0, 360);
+      m.rotation = Quat.fromDirection(random.vec3().normalize());
       this.scene.push(m);
+      this.spheres.push(m);
     }
 
     this.camera = new PerspectiveCamera(60, 2/1, 1, 100);
@@ -97,16 +116,16 @@ sys.Window.create({
         position: new Vec3(0, 0, 0),
         scale: new Vec3(1, 1, 1),
         t: 0,
-        dt: geom.randomFloat(0, 1),
-        k1: geom.randomFloat(0, 5),
-        k2: geom.randomFloat(0, 5),
-        r: geom.randomFloat(1, 3),
+        dt: random.float(0, 1),
+        k1: random.float(0, 5),
+        k2: random.float(0, 5),
+        r: random.float(1, 3),
         uniforms: {
-          color: Color.fromHSL(geom.randomFloat(0.6, 0.99), 0.8, 0.25)
+          color: Color.fromHSL(random.float(0.6, 0.79), 0.8, 0.25)
         }
       });
       var l = this.lights[this.lights.length-1];
-      l.uniforms.color = Color.fromHSL(l.k2 % 1, 0.8, 0.25)
+      l.uniforms.color = Color.fromHSL(random.float(0.6, 0.79), 0.8, 0.25)
     }
 
     this.lightMesh = new Mesh(new Sphere(0.05), new SolidColor());
@@ -186,6 +205,11 @@ sys.Window.create({
 
     this.lightPos = this.lights[0].position;
     this.lightPos = new Vec3(0, 0, 1);
+
+    this.starMesh.rotation.setAxisAngle(UP, this.time * 20);
+    this.spheres.forEach(function(sphere) {
+      sphere.position = evalPos(sphere.theta, sphere.phi - this.time * 20).scale(sphere.radius);
+    }.bind(this))
   },
   draw: function() {
     Time.verbose = true;
@@ -202,12 +226,12 @@ sys.Window.create({
     var color = root.render({ drawFunc: this.drawColor.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
-    //var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
+    var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
 
     this.deferredPointLight.uniforms.albedoMap = color.getSourceTexture();
     this.deferredPointLight.uniforms.normalMap = normals.getSourceTexture();
     this.deferredPointLight.uniforms.depthMap = depth.getSourceTexture();
-    this.deferredPointLight.uniforms.occlusionMap = color.getSourceTexture();
+    this.deferredPointLight.uniforms.occlusionMap = ssao.getSourceTexture();
     this.deferredPointLight.uniforms.roughness = this.roughness;
     this.deferredPointLight.uniforms.fov = this.camera.getFov();
     this.deferredPointLight.uniforms.near = this.camera.getNear();
@@ -233,7 +257,9 @@ sys.Window.create({
     this.gl.colorMask(1, 1, 1, 1);
 
     this.lights[0].scale.set(1, 1, 1)
-    //this.lightMesh.drawInstances(this.camera, this.lights);
+    this.lightMesh.drawInstances(this.camera, this.lights);
+
+    //lights.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
 
     glu.viewport(0, 0, this.width, this.height);
     this.gui.draw();
