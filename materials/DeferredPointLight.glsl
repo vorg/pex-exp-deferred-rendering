@@ -22,6 +22,7 @@ void main() {
   gl_Position = projectionMatrix * ecPos;
   vTexCoord = gl_Position.xy/gl_Position.w * 0.5 + 0.5;
   ecLighPos = (viewMatrix * vec4(lightPos, 1.0)).xyz;
+  //ecLighPos = lightPos;
 }
 
 #endif
@@ -70,31 +71,53 @@ vec3 Fresnel(vec3 specAlbedo, vec3 H, vec3 L) {
   return specAlbedo + (1.0 - specAlbedo) * pow((1.0 - LdotH), 5.0);
 }
 
-vec3 getViewRay(vec2 tc) {
+//fron depth buf normalized z to linear (eye space) z
+//http://stackoverflow.com/questions/6652253/getting-the-true-z-value-from-the-depth-buffer
+float ndcDepthToEyeSpace(float ndcDepth) {
+  return 2.0 * near * far / (far + near - ndcDepth * (far - near));
+}
+
+//fron depth buf normalized z to linear (eye space) z
+//http://stackoverflow.com/questions/6652253/getting-the-true-z-value-from-the-depth-buffer
+float readDepth(sampler2D depthMap, vec2 coord) {
+  float z_b = texture2D(depthMap, coord).r;
+  float z_n = 2.0 * z_b - 1.0;
+  return ndcDepthToEyeSpace(z_n);
+}
+
+vec3 getFarViewDir(vec2 tc) {
   float hfar = 2.0 * tan(fov/2.0/180.0 * PI) * far;
   float wfar = hfar * aspectRatio;
-  vec3 ray = (vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far));
+  vec3 dir = (vec3(wfar * (tc.x - 0.5), hfar * (tc.y - 0.5), -far));
+  return dir;
+}
+
+vec3 getViewRay(vec2 tc) {
+  vec3 ray = normalize(getFarViewDir(tc));
   return ray;
 }
 
+//asumming z comes from depth buffer (ndc coords) and it's not a linear distance from the camera but
+//perpendicular to the near/far clipping planes
 //http://mynameismjp.wordpress.com/2010/09/05/position-from-depth-3/
-//assumes z = len(ecPos.xyz)
+//assumes z = eye space z
 vec3 reconstructPositionFromDepth(vec2 texCoord, float z) {
-  vec3 ray = getViewRay(texCoord);
-  return normalize(ray) * z;
+  vec3 ray = getFarViewDir(texCoord);
+  vec3 pos = ray;
+  return pos * z / far;
 }
 
 //Problems more sharp metal doesn't get darker
 
 void main() {
-  vec3 normal = texture2D(normalMap, vTexCoord).rgb - 0.5; //assumes rgb = ecNormal.xyz + 0.5
+  vec3 normal = texture2D(normalMap, vTexCoord).rgb; //assumes rgb = ecNormal.xyz + 0.5
   vec4 albedoValue = texture2D(albedoMap, vTexCoord);
   vec3 albedoColor = pow(albedoValue.rgb, vec3(2.2));
   vec3 specularColor = albedoColor; //for now
   float depth = texture2D(depthMap, vTexCoord).a; //assumes a = len(ecPos.xyz)
   float occlusion = texture2D(occlusionMap, vTexCoord).r;
 
-  vec3 position = reconstructPositionFromDepth(vTexCoord, texture2D(depthMap, vTexCoord).a);
+  vec3 position = reconstructPositionFromDepth(vTexCoord, readDepth(depthMap, vTexCoord));
 
   vec3 FinalColor = vec3(0.0);
   vec3 N = normalize(normal - 0.5);
@@ -108,41 +131,16 @@ void main() {
   float NdotH = clamp(dot(N, H), 0.0, 1.0);
   float VdotH = clamp(dot(V, H), 0.0, 1.0);
 
-  //albedoColor = vec3(0.2, 0.2, 0.2); //TEMP
-  //albedo = vec3(0.0); //TEMP
   float lightDistance = length(ecLighPos - position.xyz);
   float maxMipMapLevel = 6.0; //most blurry
   vec3 F0 = specularColor;
 
-  if (lightDistance < lightRadius) {
-  }
-  else {
-  //  discard;
-  }
-
   float metallic = 0.0;
-  //float roughness = 0.9; //0 - reflective, 1 - matte
-  float smoothness = 1.0 - roughness;    //0 - matte, 1 - reflective
+  float smoothness = 1.0 - roughness; //0 - matte, 1 - reflective
   float specular = 0.5;
 
-  /*
-
-  //indirect diffuse from IBL
-  vec3 envAmbient = environmentMap(reflectionMap, N, position, maxMipMapLevel);
-  envAmbient = pow(envAmbient, vec3(4.2)); //correct gamma TEMP: overexposed texture corrected
-
-  //indirect specular from IBL
-  vec3 envSpecular = environmentMap(reflectionMap, N, position, (1.0 - (1.0 - roughness) * (1.0 - roughness)) * maxMipMapLevel);
-  envSpecular = pow(envSpecular, vec3(4.2)); //correct gamma TEMP: overexposed texture corrected
-
-  */
   //Based on "Real Shading in Unreal Engine 4"
   float lightFalloff = pow(clamp(1.0 - pow(lightDistance/lightRadius, 4.0), 0.0, 1.0), 2.0) / (pow(lightDistance, 2.0) + 1.0);
-
-  /*
-  //Indirect diffuse
-  vec3 LIndirectDiffuse = mix(albedoColor, envSpecular, metallic) * envAmbient * (1.0 - metallic); //TODO: what's metal color?
-  */
 
   //Diffuse Fresnel (Disney) aka glossy Fresnel
   //Should be 2D lookup texture for IBL as in UnreadEngine4
@@ -172,11 +170,6 @@ void main() {
   //Linear interpolation between specular color F0 and white
   vec3 Fvh = F0 + (1.0 - F0) * pow((1.0 - VdotH), 5.0);
 
-  /*
-  //Indirect specular
-  vec3 LIndirectSpecular = Fvh * specular * envSpecular * NdotL; //TODO: Fresnel * IBLspec(roughness)
-  */
-
   //Visibility Term: Schlick-Smith
   //                                          n.v               (0.8 + 0.5*a)^2
   //G(l,v,h) = G1(l)* G1(v)    G1(v) = -----------------    k = ---------------
@@ -190,69 +183,21 @@ void main() {
   vec3 flv = Dh * Fvh * Glvn / (4.0 * NdotL * NdotV);
 
   //vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor * lightFalloff * clamp(NdotL, 0.0, 1.0);
-  vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * 1.0 * clamp(NdotL, 0.0, 1.0);
-  vec3 LDirectSpecualar = vec3(flv) * lightBrightness * lightColor.rgb * 1.0 * clamp(NdotL, 0.0, 1.0);
-  /*
-
-  
-  FinalColor += LIndirectDiffuse * indirectDiffuseEnabled;
-  FinalColor += LIndirectSpecular * indirectSpecularEnabled;
-  FinalColor += LDirectDiffuse * directDiffuseEnabled;
-  FinalColor += LDirectSpecualar * directSpecularEnabled;
-  FinalColor = mix(FinalColor, FinalColor * vec3(occlusion), ssaoEnabled); //SSAO
-
-  if (fogEnabled > 0.0) {
-    //Fog
-    float LOG2 = 1.442695;
-    float fogFragCoord = 0;
-    float fogFactor;
-    if (-position.z < 5.0) {
-      fogFragCoord = max(0, length(position) - fogStart + fogOffset);
-      fogFactor = exp2(-fogForegroundDensity * fogForegroundDensity * fogFragCoord * fogFragCoord * LOG2);
-      fogFactor = clamp(fogFactor, 0.0, 1.0);
-      FinalColor = mix(fogColor.rgb, FinalColor, fogFactor);
-      //FinalColor = mix(vec3(0.0), FinalColor, fogFactor);
-    }
-    else {
-      fogFragCoord = max(0, length(position) - fogStart);
-      fogFactor = exp2(-fogDensity * fogDensity * fogFragCoord * fogFragCoord * LOG2);
-      fogFactor = clamp(fogFactor, 0.0, 1.0);
-      FinalColor = mix(fogColor.rgb, FinalColor, fogFactor);
-    }
-  }
-
-
-  
-
-  //FinalColor += vec3(fogFactor);
-
-  //FinalColor = vec3(metallic);
-
-  
-
-  //FinalColor = vec3(position.z/100.0);
-  //else FinalColor = vec3(occlusion);
-  //FinalColor *= fogFactor;
-  */
+  vec3 LDirectDiffuse = 1.0 / PI * albedoColor * (1.0 - metallic) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
+  vec3 LDirectSpecualar = vec3(flv) * lightBrightness * lightColor.rgb * lightFalloff * clamp(NdotL, 0.0, 1.0);
 
   //FinalColor = (LDirectDiffuse + LDirectSpecualar) * occlusion;
-  FinalColor = (LDirectDiffuse + LDirectSpecualar);
+  FinalColor = (LDirectDiffuse + LDirectSpecualar) * occlusion;
 
   gl_FragColor.rgb = FinalColor;
 
-  //gl_FragColor.rgb = vec3(normal);
+  //gl_FragColor.rgb = vec3(lightDistance/20.0);
+  //lightFalloff = pow(clamp(1.0 - pow(lightRadius/lightDistance, 4.0), 0.0, 1.0), 2.0) / (pow(lightDistance, 2.0) + 1.0);
+  //lightFalloff = clamp(1.0 - pow(lightRadius/lightDistance, 4.0), 0.0, 1.0);
+  //gl_FragColor.rgb = vec3(distance(ecLighPos, vec3(2.0, 2.0, -3.0)));
+  //gl_FragColor.rgb = vec3(position);
 
-  //gl_FragColor.rgb = normal * 0.5 + 0.5;
-
-  //gl_FragColor.rgb = vec3(0.01, 0.0, 0.0);
-  //gl_FragColor.rgb += vec3(0.01,  lightFalloff, 0.0);
-
-  //gl_FragColor = vec4(lightDistance/lightRadius);
-  //gl_FragColor.rgb = vec3(position.x);
-  //gl_FragColor.a = 1.0;
-  //gl_FragColor = vec4(fract(vTexCoord*5.0), 0.0, 1.0);
-  //gl_FragColor.rgb = vec3(ecLighPos.y, 0.0, 0.0);
-  //gl_FragColor = vec4(occlusion/5.0);
+  //L = normalize(vec3(10.0, 10.0, 10.0));
 }
 
 #endif

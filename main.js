@@ -18,6 +18,7 @@ var Arcball             = glu.Arcball;
 var ShowNormals         = materials.ShowNormals;
 var SolidColor          = materials.SolidColor;
 var ShowDepth           = materials.ShowDepth;
+var ShowPosition        = materials.ShowPosition;
 var Color               = color.Color;
 var Platform            = sys.Platform;
 var Time                = sys.Time;
@@ -26,7 +27,6 @@ var Quat                = geom.Quat;
 var GUI                 = gui.GUI;
 var Deferred            = require('./fx/Deferred');
 var DeferredPointLight  = require('./materials/DeferredPointLight');
-var SSAO                = require('./fx/SSAO');
 var Contrast            = require('./fx/Contrast');
 
 var UP = new Vec3(0, 1, 0);
@@ -46,8 +46,8 @@ sys.Window.create({
     width: 1024,
     height: 512,
     type: '3d',
-    //fullscreen: Platform.isBrowser ? true : false,
-    fullscreen: true,
+    fullscreen: Platform.isBrowser ? true : false,
+    //fullscreen: true,
     //highdpi: Platform.isBrowser ? 2 : false,
     borderless: true,
 
@@ -57,6 +57,7 @@ sys.Window.create({
   contrast: 1,
   ssaoStrength: 0.4,
   correctGamma: true,
+  ssao: true,
   tonemapReinhard: true,
   roughness: 0.3,
   lightRadius: 0.95,
@@ -72,7 +73,8 @@ sys.Window.create({
     }
     this.gui = new GUI(this);
     this.gui.addParam('Animate', this, 'animate');
-    this.gui.addParam('SSAO Strength', this, 'ssaoStrength', { min: 0.0, max: 1 });
+    this.gui.addParam('SSAO', this, 'ssao');
+    this.gui.addParam('SSAO Strength', this, 'ssaoStrength', { min: 0.0, max: 10 });
     this.gui.addParam('Roughness', this, 'roughness', { min: 0.01, max: 1 });
     this.gui.addParam('Tonemap Reinhard', this, 'tonemapReinhard');
     this.gui.addParam('Exposure', this, 'exposure', { min: 0.5, max: 3 });
@@ -93,7 +95,6 @@ sys.Window.create({
     this.spheres = [];
     for(var i=0; i<50; i++) {
       var m = new Mesh(sphere, null);
-      //m.position = random.vec3().normalize().scale();
       m.radius = random.float(2, 6);
       m.theta = random.float(0, 180);
       m.phi = random.float(0, 360);
@@ -102,7 +103,7 @@ sys.Window.create({
       this.spheres.push(m);
     }
 
-    this.camera = new PerspectiveCamera(60, 2/1, 1, 100);
+    this.camera = new PerspectiveCamera(60, 2/1, 1, 10);
     this.arcball = new Arcball(this, this.camera, 5);
 
     this.lightPos = new Vec3(3, 3, 3);
@@ -226,8 +227,8 @@ sys.Window.create({
     var color = root.render({ drawFunc: this.drawColor.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var normals = root.render({ drawFunc: this.drawNormals.bind(this), depth: true, width: W, height: H, bpp: 32 });
     var depth = root.render({ drawFunc: this.drawDepth.bind(this), depth: true, width: W, height: H, bpp: 32 });
-    var ssao = depth.ssao({ cutoutBg: 0, strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
-
+    var ssao = color;
+    if (this.ssao) ssao = depth.ssao({ strength: this.ssaoStrength, depthMap: depth, width: W, height: H, bpp: 32, camera: this.camera });
     this.deferredPointLight.uniforms.albedoMap = color.getSourceTexture();
     this.deferredPointLight.uniforms.normalMap = normals.getSourceTexture();
     this.deferredPointLight.uniforms.depthMap = depth.getSourceTexture();
@@ -259,7 +260,7 @@ sys.Window.create({
     this.lights[0].scale.set(1, 1, 1)
     this.lightMesh.drawInstances(this.camera, this.lights);
 
-    //lights.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
+    //ssao.blit({ x : (this.width - W * scale)/2, y: (this.height - H * scale)/2, width : W * scale, height: H * scale});
 
     glu.viewport(0, 0, this.width, this.height);
     this.gui.draw();
